@@ -20,18 +20,19 @@ import {
   canChop,
   ChopAction,
   CHOP_ERRORS,
-  getRequiredAxeAmount,
   TREE_RECOVERY_SECONDS,
 } from "features/game/events/chop";
+
+import {chop} from "features/game/events/chop";
 
 import { getTimeLeft } from "lib/utils/time";
 import { ProgressBar } from "components/ui/ProgressBar";
 import { Label } from "components/ui/Label";
 import { chopAudio, treeFallAudio } from "lib/utils/sfx";
-import { HealthBar } from "components/ui/HealthBar";
+import { GameState } from "features/game/types/game";
+
 
 const POPOVER_TIME_MS = 1000;
-const HITS = 3;
 
 interface Props {
   treeIndex: number;
@@ -79,25 +80,21 @@ export const Tree: React.FC<Props> = ({ treeIndex }) => {
     setShowPopover(false);
   };
 
-  const axesNeeded = getRequiredAxeAmount(game.context.state.inventory);
-  const axeAmount = game.context.state.inventory.Axe || new Decimal(0);
-
-  // Has enough axes to chop the tree
-  const hasAxes =
-    (selectedItem === "Axe" || axesNeeded.eq(0)) && axeAmount.gte(axesNeeded);
-
   const shake = async () => {
     if (game.matches("readonly")) {
       shakeGif.current?.goToAndPlay(0);
       return;
     }
 
-    if (!hasAxes) {
+    if (selectedItem !== "Axe") {
       return;
     }
+  
+    const axeAmount = game.context.state.inventory.Axe || new Decimal(0);
+    if(axeAmount.lessThanOrEqualTo(0))
+    return;
 
     const isPlaying = shakeGif.current?.getInfo("isPlaying");
-
     if (isPlaying) {
       return;
     }
@@ -107,8 +104,11 @@ export const Tree: React.FC<Props> = ({ treeIndex }) => {
 
     setTouchCount((count) => count + 1);
 
+    // Randomise the shakes to break
+    const shakesToBreak = tree.wood.toNumber();
+
     // On third shake, chop
-    if (touchCount > 0 && touchCount === HITS - 1) {
+    if (touchCount > 0 && touchCount === shakesToBreak) {
       chop();
       treeFallAudio.play();
       setTouchCount(0);
@@ -116,8 +116,6 @@ export const Tree: React.FC<Props> = ({ treeIndex }) => {
   };
 
   const chop = async () => {
-    setTouchCount(0);
-
     try {
       gameService.send("tree.chopped", {
         index: treeIndex,
@@ -149,17 +147,27 @@ export const Tree: React.FC<Props> = ({ treeIndex }) => {
       displayPopover(
         <span className="text-xs text-white text-shadow">{e.message}</span>
       );
+
+      setTouchCount(0);
     }
   };
 
   const handleHover = () => {
-    if (game.matches("readonly") || hasAxes) return;
+    if (
+      game.matches("readonly") ||
+      (selectedItem === "Axe" && game.context.state.inventory.Axe?.gte(1))
+    )
+      return;
     treeRef.current?.classList["add"]("cursor-not-allowed");
     setShowLabel(true);
   };
 
   const handleMouseLeave = () => {
-    if (game.matches("readonly") || hasAxes) return;
+    if (
+      game.matches("readonly") ||
+      (selectedItem === "Axe" && game.context.state.inventory.Axe?.gte(1))
+    )
+      return;
     treeRef.current?.classList["remove"]("cursor-not-allowed");
     setShowLabel(false);
   };
@@ -252,18 +260,6 @@ export const Tree: React.FC<Props> = ({ treeIndex }) => {
           </div>
         </>
       )}
-
-      <div
-        className={classNames(
-          "transition-opacity pointer-events-none absolute top-4 left-2",
-          {
-            "opacity-100": touchCount > 0,
-            "opacity-0": touchCount === 0,
-          }
-        )}
-      >
-        <HealthBar percentage={collecting ? 0 : 100 - (touchCount / 3) * 100} />
-      </div>
 
       <div
         className={classNames(
