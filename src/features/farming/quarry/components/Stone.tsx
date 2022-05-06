@@ -98,12 +98,11 @@ export const Stone: React.FC<Props> = ({ rockIndex }) => {
       sparkGif.current?.goToAndPlay(0);
       return;
     }
-   
-    const wpickAmount = game.context.state.inventory.Pickaxe || new Decimal(0);
-    if(wpickAmount.lessThanOrEqualTo(0))
-    return;
-    
-  
+
+    const pickaxeAmount =
+      game.context.state.inventory.Pickaxe || new Decimal(0);
+    if (pickaxeAmount.lessThanOrEqualTo(0)) return;
+
     if (selectedItem == tool && !isPlaying) {
       miningAudio.play();
 
@@ -146,13 +145,13 @@ export const Stone: React.FC<Props> = ({ rockIndex }) => {
     }
   };
 
-  const handleHover = () => {  
+  const handleHover = () => {
     if (
       readonly ||
       (selectedItem === tool && game.context.state.inventory[tool]?.gte(1))
     )
       return;
-   
+
     containerRef.current?.classList["add"]("cursor-not-allowed");
     setShowLabel(true);
   };
